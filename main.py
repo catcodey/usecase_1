@@ -1,12 +1,26 @@
+
+# --- 1. CONFIGURATION ---
 import streamlit as st
 import vertexai
 from vertexai.generative_models import GenerativeModel
 import pandas as pd
 import re
+from google.oauth2 import service_account # Make sure this is imported
 
 # --- 1. CONFIGURATION ---
 PROJECT_ID = "transcript-summarizer-490013"
 LOCATION = "us-central1"
+
+# This block fixes the 503 Metadata error
+if "gcp_service_account" in st.secrets:
+    # Use the JSON secrets you pasted into Streamlit Cloud
+    creds_info = st.secrets["gcp_service_account"]
+    credentials = service_account.Credentials.from_service_account_info(creds_info)
+    vertexai.init(project=PROJECT_ID, location=LOCATION, credentials=credentials)
+else:
+    # This part only runs if you are testing locally on your Mac 
+    # and have already run 'gcloud auth application-default login'
+    vertexai.init(project=PROJECT_ID, location=LOCATION)
 
 vertexai.init(project=PROJECT_ID, location=LOCATION)
 model = GenerativeModel(
