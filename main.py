@@ -1,28 +1,29 @@
-
-# --- 1. CONFIGURATION ---
 import streamlit as st
 import vertexai
 from vertexai.generative_models import GenerativeModel
 import pandas as pd
 import re
-from google.oauth2 import service_account # Make sure this is imported
+import nltk
+from nltk.corpus import stopwords
+from google.oauth2 import service_account
 
 # --- 1. CONFIGURATION ---
 PROJECT_ID = "transcript-summarizer-490013"
 LOCATION = "us-central1"
 
-# This block fixes the 503 Metadata error
+# Download necessary NLTK data
+try:
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    nltk.download('stopwords')
+
 if "gcp_service_account" in st.secrets:
-    # Use the JSON secrets you pasted into Streamlit Cloud
     creds_info = st.secrets["gcp_service_account"]
     credentials = service_account.Credentials.from_service_account_info(creds_info)
     vertexai.init(project=PROJECT_ID, location=LOCATION, credentials=credentials)
 else:
-    # This part only runs if you are testing locally on your Mac 
-    # and have already run 'gcloud auth application-default login'
     vertexai.init(project=PROJECT_ID, location=LOCATION)
 
-vertexai.init(project=PROJECT_ID, location=LOCATION)
 model = GenerativeModel(
     "gemini-2.0-flash",
     system_instruction="Keep every response extremely brief. Summaries must be 5 short bullets. All follow-ups under 50 words."
@@ -42,9 +43,20 @@ if "uploader_key" not in st.session_state:
 
 # --- 3. HELPER FUNCTIONS ---
 def clean_text(text):
-    text = re.sub(r'\s+', ' ', text)
-    fillers = r'\b(um|uh|ah|er|basically|actually|you know|sort of|like)\b'
-    return re.sub(fillers, '', text, flags=re.IGNORECASE).strip()
+    if not text:
+        return ""
+    # Remove non-alphanumeric but keep sentence markers
+    text = re.sub(r'[^a-zA-Z0-9\s\.\?\!]', '', text).lower()
+    
+    # Load Stopwords
+    stop_words = set(stopwords.words('english'))
+    fillers = {'um', 'uh', 'ah', 'er', 'basically', 'actually', 'you know', 'sort of', 'like'}
+    
+    # Filter text
+    words = text.split()
+    cleaned_words = [w for w in words if w not in stop_words and w not in fillers]
+    
+    return " ".join(cleaned_words).strip()
 
 def extract_data(files_list):
     combined_text = ""
@@ -64,12 +76,8 @@ col1, col2 = st.columns(2, gap="large")
 
 with col1:
     st.subheader("Input")
-    
-    # Check states for mutual exclusion
     has_text = len(st.session_state.input_text_val.strip()) > 0
     
-    # 1. File Uploader
-    # We use a key that we can increment to force a clear
     uploaded_files = st.file_uploader(
         "Upload TXT/XLSX (Multiple allowed)", 
         type=["txt", "xlsx"], 
@@ -79,13 +87,11 @@ with col1:
     )
     
     has_files = uploaded_files is not None and len(uploaded_files) > 0
-
     if has_files:
         st.info("Files uploaded. Text area is now disabled.")
     
     st.markdown("---")
 
-    # 2. Text Area
     manual_input = st.text_area(
         "Paste Transcript:", 
         height=300, 
@@ -93,21 +99,15 @@ with col1:
         disabled=has_files,
         placeholder="Paste your text here..."
     )
-    # Update session state with manual input
     st.session_state.input_text_val = manual_input
     
     if has_text:
         st.info("Text detected. File upload is now disabled.")
 
-    # Action Buttons
     btn_col1, btn_col2 = st.columns(2)
     with btn_col1:
         if st.button("🚀 Generate", use_container_width=True):
-            raw_data = ""
-            if has_files:
-                raw_data = extract_data(uploaded_files)
-            elif has_text:
-                raw_data = manual_input
+            raw_data = extract_data(uploaded_files) if has_files else manual_input
                 
             if raw_data:
                 cleaned = clean_text(raw_data)
@@ -129,7 +129,7 @@ with col1:
             st.session_state.input_text_val = ""
             st.session_state.summary_text = ""
             st.session_state.messages = []
-            st.session_state.uploader_key += 1 # This clears the file uploader widget
+            st.session_state.uploader_key += 1 
             st.rerun()
 
 with col2:
