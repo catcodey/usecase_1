@@ -9,7 +9,7 @@ from google.oauth2 import service_account
 
 # --- 1. CONFIGURATION ---
 PROJECT_ID = "transcript-summarizer-490013"
-LOCATION = "us-east4"
+LOCATION = "asia-southeast1"
 
 # Download necessary NLTK data
 try:
