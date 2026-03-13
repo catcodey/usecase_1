@@ -25,7 +25,7 @@ else:
     vertexai.init(project=PROJECT_ID, location=LOCATION)
 
 model = GenerativeModel(
-    "gemini-2.0-flash",
+    "gemini-2.0-flash-001",
     system_instruction="Keep every response extremely brief. Summaries must be 5 short bullets. All follow-ups under 50 words."
 )
 
